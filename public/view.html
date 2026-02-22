@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Message - Baca Pesan</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤫 Secret Message</h1>
+            <p class="subtitle">Membaca pesan rahasia</p>
+        </header>
+
+        <main>
+            <div id="loading" class="loading-message">
+                <p>⏳ Memuat pesan...</p>
+            </div>
+
+            <div id="messageContent" class="message-card" style="display: none;">
+                <h3>📨 Pesan Rahasia</h3>
+                <div class="message-box">
+                    <pre id="messageText"></pre>
+                </div>
+                <div class="message-info">
+                    <p id="createdAt"></p>
+                    <p id="expiresAt"></p>
+                </div>
+                <a href="/" class="btn-primary">Buat pesan sendiri</a>
+            </div>
+
+            <div id="expiredMessage" class="expired-card" style="display: none;">
+                <h3>⏰ Pesan Sudah Kadaluarsa</h3>
+                <p>Maaf, pesan ini sudah tidak tersedia karena telah melewati batas waktu 12 jam.</p>
+                <a href="/" class="btn-primary">Buat pesan baru</a>
+            </div>
+
+            <div id="error" class="error-message" style="display: none;"></div>
+        </main>
+
+        <footer>
+            <p>🔒 Pesan otomatis terhapus setelah 12 jam</p>
+        </footer>
+    </div>
+
+    <script>
+        // Get message ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const messageId = urlParams.get('id');
+
+        const loadingEl = document.getElementById('loading');
+        const messageContent = document.getElementById('messageContent');
+        const expiredMessage = document.getElementById('expiredMessage');
+        const errorEl = document.getElementById('error');
+        const messageText = document.getElementById('messageText');
+        const createdAtEl = document.getElementById('createdAt');
+        const expiresAtEl = document.getElementById('expiresAt');
+
+        async function loadMessage() {
+            if (!messageId || messageId.length !== 24) {
+                showError('ID pesan tidak valid');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/message/${messageId}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (response.status === 410) {
+                        showExpired();
+                    } else {
+                        throw new Error(data.error || 'Gagal memuat pesan');
+                    }
+                    return;
+                }
+
+                // Display message
+                messageText.textContent = data.data.content;
+                
+                const created = new Date(data.data.createdAt);
+                const expires = new Date(data.data.expiresAt);
+                
+                createdAtEl.textContent = `Dibuat: ${created.toLocaleString('id-ID')}`;
+                expiresAtEl.textContent = `Berlaku sampai: ${expires.toLocaleString('id-ID')}`;
+                
+                showMessage();
+
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function showMessage() {
+            loadingEl.style.display = 'none';
+            messageContent.style.display = 'block';
+            expiredMessage.style.display = 'none';
+            errorEl.style.display = 'none';
+        }
+
+        function showExpired() {
+            loadingEl.style.display = 'none';
+            messageContent.style.display = 'none';
+            expiredMessage.style.display = 'block';
+            errorEl.style.display = 'none';
+        }
+
+        function showError(message) {
+            loadingEl.style.display = 'none';
+            messageContent.style.display = 'none';
+            expiredMessage.style.display = 'none';
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        // Load message when page loads
+        loadMessage();
+    </script>
+</body>
+</html>

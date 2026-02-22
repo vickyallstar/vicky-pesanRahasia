@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Message - Buat Pesan Rahasia</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤫 Secret Message</h1>
+            <p class="subtitle">Buat pesan rahasia yang akan otomatis terhapus setelah 12 jam</p>
+        </header>
+
+        <main>
+            <div class="card">
+                <form id="messageForm">
+                    <div class="form-group">
+                        <label for="message">Pesan Rahasia:</label>
+                        <textarea 
+                            id="message" 
+                            name="message" 
+                            rows="8" 
+                            placeholder="Tulis pesan rahasiamu di sini..." 
+                            maxlength="5000"
+                            required
+                        ></textarea>
+                        <div class="char-counter">
+                            <span id="charCount">0</span>/5000 karakter
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="btn-primary">
+                        <span class="btn-text">Buat Link Rahasia</span>
+                        <span class="loading-spinner" style="display: none;">⏳</span>
+                    </button>
+                </form>
+            </div>
+
+            <div id="result" class="result-card" style="display: none;">
+                <h3>✅ Link Rahasia Berhasil Dibuat!</h3>
+                <p>Link ini akan aktif selama 12 jam:</p>
+                <div class="url-container">
+                    <input type="text" id="secretUrl" readonly>
+                    <button id="copyBtn" class="btn-secondary" onclick="copyUrl()">📋 Salin</button>
+                </div>
+                <p class="expiry-info" id="expiryInfo"></p>
+                <button onclick="createNew()" class="btn-link">Buat pesan baru lagi</button>
+            </div>
+
+            <div id="error" class="error-message" style="display: none;"></div>
+        </main>
+
+        <footer>
+            <p>🔒 Pesan akan otomatis terhapus setelah 12 jam</p>
+        </footer>
+    </div>
+
+    <script>
+        const form = document.getElementById('messageForm');
+        const messageInput = document.getElementById('message');
+        const charCount = document.getElementById('charCount');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const loadingSpinner = submitBtn.querySelector('.loading-spinner');
+        const resultDiv = document.getElementById('result');
+        const errorDiv = document.getElementById('error');
+        const secretUrl = document.getElementById('secretUrl');
+        const expiryInfo = document.getElementById('expiryInfo');
+
+        // Update character counter
+        messageInput.addEventListener('input', () => {
+            const count = messageInput.value.length;
+            charCount.textContent = count;
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const content = messageInput.value.trim();
+            
+            if (!content) {
+                showError('Pesan tidak boleh kosong');
+                return;
+            }
+
+            // Show loading state
+            setLoading(true);
+            hideError();
+            hideResult();
+
+            try {
+                const response = await fetch('/api/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Terjadi kesalahan');
+                }
+
+                // Show success result
+                secretUrl.value = data.data.url;
+                
+                const expiryDate = new Date(data.data.expiresAt);
+                expiryInfo.textContent = `Berlaku sampai: ${expiryDate.toLocaleString('id-ID')}`;
+                
+                showResult();
+                form.reset();
+                charCount.textContent = '0';
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Copy URL to clipboard
+        window.copyUrl = async () => {
+            try {
+                await navigator.clipboard.writeText(secretUrl.value);
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Tersalin!';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                showError('Gagal menyalin link');
+            }
+        };
+
+        // Create new message
+        window.createNew = () => {
+            hideResult();
+            messageInput.focus();
+        };
+
+        // Helper functions
+        function setLoading(isLoading) {
+            if (isLoading) {
+                btnText.style.display = 'none';
+                loadingSpinner.style.display = 'inline';
+                submitBtn.disabled = true;
+            } else {
+                btnText.style.display = 'inline';
+                loadingSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+        }
+
+        function showResult() {
+            resultDiv.style.display = 'block';
+        }
+
+        function hideResult() {
+            resultDiv.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
