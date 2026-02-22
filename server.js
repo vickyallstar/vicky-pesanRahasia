@@ -54,7 +54,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============= TEST ROUTE =============
-app.get('/api/health', (req, res) => {
+app.get('/v1/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     time: new Date().toISOString(),
