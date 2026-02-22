@@ -77,25 +77,39 @@ mongoose.connect(process.env.MONGODB_URI)
 app.post('/api/create', async (req, res) => {
   try {
     const { content } = req.body;
-    console.log('📝 Creating new message');
+    console.log('📝 Creating message:', content);
 
+    // Validasi
     if (!content || content.trim() === '') {
-      return res.status(400).json({ success: false, error: 'Pesan tidak boleh kosong' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Pesan tidak boleh kosong' 
+      });
     }
 
     if (content.length > 5000) {
-      return res.status(400).json({ success: false, error: 'Pesan maksimal 5000 karakter' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Pesan maksimal 5000 karakter' 
+      });
     }
 
-    const message = await Message.create({ content: content.trim() });
+    // Simpan ke DB
+    const message = await Message.create({ 
+      content: content.trim() 
+    });
     
+    console.log('✅ Message created:', message._id);
+
+    // Buat URL
     const baseUrl = process.env.NODE_ENV === 'production' 
       ? `https://${req.get('host')}`
       : `http://localhost:${PORT}`;
     
     const messageUrl = `${baseUrl}/view.html?id=${message._id}`;
 
-    res.status(201).json({
+    // Kirim response
+    return res.status(201).json({
       success: true,
       data: {
         id: message._id,
@@ -105,8 +119,11 @@ app.post('/api/create', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creating message:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
+    console.error('❌ Error creating message:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Terjadi kesalahan server' 
+    });
   }
 });
 
