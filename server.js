@@ -77,9 +77,9 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.log('📋 Registering API routes...');
     
     // CREATE MESSAGE
-    console.log('  ✅ POST /api/create');
-    app.post('/api/create', async (req, res) => {
-      console.log('🔥🔥🔥 POST /api/create EXECUTED! 🔥🔥🔥');
+    console.log('  ✅ POST /v1/create');
+    app.post('/v1/create', async (req, res) => {
+      console.log('🔥🔥🔥 POST /v1/create EXECUTED! 🔥🔥🔥');
       console.log('Request body:', req.body);
       
       try {
@@ -141,8 +141,8 @@ mongoose.connect(process.env.MONGODB_URI, {
     });
 
     // GET MESSAGE
-    console.log('  ✅ GET /api/message/:id');
-    app.get('/api/message/:id', async (req, res) => {
+    console.log('  ✅ GET /v1/message/:id');
+    app.get('/v1/message/:id', async (req, res) => {
       console.log(`🔍 GET /api/message/${req.params.id} EXECUTED!`);
       
       try {
