@@ -55,11 +55,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ============= TEST ROUTE =============
 app.get('/v1/health', (req, res) => {
-  res.json({ 
+  res.status(200).json({ 
     status: 'ok', 
     time: new Date().toISOString(),
     port: PORT,
-    env: process.env.NODE_ENV,
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
