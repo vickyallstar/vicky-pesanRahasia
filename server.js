@@ -78,66 +78,64 @@ mongoose.connect(process.env.MONGODB_URI, {
     // CREATE MESSAGE
     console.log('  ✅ POST /v1/create');
     app.post('/v1/create', async (req, res) => {
-      console.log('🔥🔥🔥 POST /v1/create EXECUTED! 🔥🔥🔥');
-      console.log('Request body:', req.body);
-      
-      try {
-        const { content } = req.body;
-        console.log('📝 Creating message:', content?.substring(0, 50));
+  console.log('🔥🔥🔥 POST /v1/create EXECUTED! 🔥🔥🔥');
+  console.log('Request body:', req.body);
+  console.log('Content-Type:', req.headers['content-type']);
+  
+  try {
+    const { content } = req.body;
+    console.log('Content received:', content);
 
-        // Validasi
-        if (!content || content.trim() === '') {
-          console.log('❌ Error: Pesan kosong');
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Pesan tidak boleh kosong' 
-          });
-        }
+    // Validasi
+    if (!content || content.trim() === '') {
+      console.log('Error: Empty content');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Pesan tidak boleh kosong' 
+      });
+    }
 
-        if (content.length > 5000) {
-          console.log('❌ Error: Pesan terlalu panjang');
-          return res.status(400).json({ 
-            success: false, 
-            error: 'Pesan maksimal 5000 karakter' 
-          });
-        }
+    if (content.length > 5000) {
+      console.log('Error: Content too long');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Pesan maksimal 5000 karakter' 
+      });
+    }
 
-        // Simpan ke DB
-        const message = await Message.create({ 
-          content: content.trim() 
-        });
-        
-        console.log('✅ Message created dengan ID:', message._id);
+    // Simpan ke DB
+    const message = await Message.create({ 
+      content: content.trim() 
+    });
+    
+    console.log('✅ Message created:', message._id);
 
-        // Buat URL
-        let baseUrl;
-        if (process.env.NODE_ENV === 'production') {
-          baseUrl = `${req.protocol}://${req.get('host')}`;
-        } else {
-          baseUrl = `http://localhost:${PORT}`;
-        }
-        
-        const messageUrl = `${baseUrl}/view.html?id=${message._id}`;
+    // Buat URL
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? `${req.protocol}://${req.get('host')}`
+      : `http://localhost:${PORT}`;
+    
+    const messageUrl = `${baseUrl}/view.html?id=${message._id}`;
 
-        // Kirim response
-        console.log('✅ Sending success response');
-        return res.status(201).json({
-          success: true,
-          data: {
-            id: message._id,
-            url: messageUrl,
-            expiresAt: message.expiresAt
-          }
-        });
-
-      } catch (error) {
-        console.error('❌ Error creating message:', error);
-        return res.status(500).json({ 
-          success: false, 
-          error: 'Terjadi kesalahan server' 
-        });
+    // Kirim response JSON
+    console.log('✅ Sending success response');
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: message._id,
+        url: messageUrl,
+        expiresAt: message.expiresAt
       }
     });
+
+  } catch (error) {
+    console.error('❌ Error creating message:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Terjadi kesalahan server: ' + error.message 
+    });
+  }
+});
 
     // GET MESSAGE
     console.log('  ✅ GET /v1/message/:id');
