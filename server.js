@@ -24,11 +24,22 @@ console.log('- MONGODB_URI exists:', !!process.env.MONGODB_URI);
 console.log('- Current directory:', __dirname);
 console.log('- Public path:', path.join(__dirname, 'public'));
 
-// Middleware
+// Middleware - URUTAN PENTING!
+// 1. CORS harus PERTAMA
+app.use(cors({
+  origin: '*',  // Allow semua domain dulu
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// 2. Handle OPTIONS method secara eksplisit
+app.options('*', cors()); // Ini penting untuk preflight request
+
+// 3. Middleware lainnya
 app.use(helmet({
   contentSecurityPolicy: false,
 }));
-app.use(cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -46,13 +57,17 @@ app.get('/api/health', (req, res) => {
     status: 'ok', 
     time: new Date().toISOString(),
     port: PORT,
-    env: process.env.NODE_ENV
+    env: process.env.NODE_ENV,
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
 // Koneksi MongoDB
 console.log('📡 Connecting to MongoDB...');
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+})
   .then(() => {
     console.log('✅ Terkoneksi ke MongoDB');
     
@@ -74,10 +89,13 @@ mongoose.connect(process.env.MONGODB_URI)
   });
 
 // API Routes
+// Tambah route OPTIONS explicit untuk /api/create
+app.options('/api/create', cors());
+
 app.post('/api/create', async (req, res) => {
   try {
     const { content } = req.body;
-    console.log('📝 Creating message:', content);
+    console.log('📝 Creating message:', content?.substring(0, 50));
 
     // Validasi
     if (!content || content.trim() === '') {
@@ -101,10 +119,14 @@ app.post('/api/create', async (req, res) => {
     
     console.log('✅ Message created:', message._id);
 
-    // Buat URL
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? `https://${req.get('host')}`
-      : `http://localhost:${PORT}`;
+    // Buat URL - FIX UNTUK PRODUCTION
+    let baseUrl;
+    if (process.env.NODE_ENV === 'production') {
+      // Di production, gunakan host dari request
+      baseUrl = `${req.protocol}://${req.get('host')}`;
+    } else {
+      baseUrl = `http://localhost:${PORT}`;
+    }
     
     const messageUrl = `${baseUrl}/view.html?id=${message._id}`;
 
@@ -127,25 +149,37 @@ app.post('/api/create', async (req, res) => {
   }
 });
 
+// OPTIONS handler untuk /api/message/:id
+app.options('/api/message/:id', cors());
+
 app.get('/api/message/:id', async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`🔍 Fetching message: ${id}`);
 
     if (!id || id.length !== 24) {
-      return res.status(400).json({ success: false, error: 'ID pesan tidak valid' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ID pesan tidak valid' 
+      });
     }
 
     const message = await Message.findById(id);
 
     if (!message) {
-      return res.status(404).json({ success: false, error: 'Pesan tidak ditemukan atau sudah kadaluarsa' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Pesan tidak ditemukan atau sudah kadaluarsa' 
+      });
     }
 
     const now = new Date();
     if (now > message.expiresAt) {
       await Message.findByIdAndDelete(id);
-      return res.status(410).json({ success: false, error: 'Pesan sudah kadaluarsa' });
+      return res.status(410).json({ 
+        success: false, 
+        error: 'Pesan sudah kadaluarsa' 
+      });
     }
 
     res.json({
@@ -159,18 +193,44 @@ app.get('/api/message/:id', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching message:', error);
-    res.status(500).json({ success: false, error: 'Terjadi kesalahan server' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Terjadi kesalahan server' 
+    });
   }
 });
 
-// 404 handler
-app.use((req, res) => {
-  console.log(`❌ 404: ${req.url}`);
-  res.status(404).sendFile(path.join(__dirname, 'public', 'index.html'));
+// 404 handler - API routes dulu
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    error: 'API endpoint tidak ditemukan' 
+  });
 });
 
-// Error handler
+// Untuk non-API routes, serve index.html
+app.use((req, res) => {
+  console.log(`📄 Serving index.html for: ${req.url}`);
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Error handler global
 app.use((err, req, res, next) => {
   console.error('💥 Global error:', err.stack);
-  res.status(500).json({ success: false, error: 'Internal server error' });
+  
+  // Kalau error dari CORS atau lainnya
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Invalid JSON' 
+    });
+  }
+  
+  res.status(500).json({ 
+    success: false, 
+    error: 'Internal server error' 
+  });
 });
+
+// Export untuk testing (optional)
+export default app;
