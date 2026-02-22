@@ -50,6 +50,7 @@
             </div>
 
             <div id="error" class="error-message" style="display: none;"></div>
+            <div id="debugInfo" style="background: #f0f0f0; padding: 10px; margin-top: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; display: none;"></div>
         </main>
 
         <footer>
@@ -66,6 +67,7 @@
         const loadingSpinner = submitBtn.querySelector('.loading-spinner');
         const resultDiv = document.getElementById('result');
         const errorDiv = document.getElementById('error');
+        const debugDiv = document.getElementById('debugInfo');
         const secretUrl = document.getElementById('secretUrl');
         const expiryInfo = document.getElementById('expiryInfo');
 
@@ -90,9 +92,12 @@
             setLoading(true);
             hideError();
             hideResult();
+            hideDebug();
 
             try {
-                // FETCH YANG SUDAH DIUBAH
+                console.log('🚀 Mengirim request ke /v1/create');
+                console.log('📦 Content:', content);
+                
                 const response = await fetch('/v1/create', {
                     method: 'POST',
                     headers: {
@@ -101,16 +106,45 @@
                     body: JSON.stringify({ content })
                 });
 
-                // Cek dulu response status
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || `HTTP Error ${response.status}`);
+                console.log('📥 Response status:', response.status);
+                console.log('📥 Response headers:', [...response.headers.entries()]);
+
+                // Cek content type
+                const contentType = response.headers.get('content-type');
+                console.log('📥 Content-Type:', contentType);
+
+                // TAMPILIN DEBUG INFO
+                let debugText = `Status: ${response.status}\n`;
+                debugText += `Content-Type: ${contentType}\n\n`;
+
+                // Coba baca response sebagai text dulu
+                const responseText = await response.text();
+                console.log('📥 Response text (first 200 chars):', responseText.substring(0, 200));
+                
+                // Tampilkan di debug div
+                debugText += `Response:\n${responseText.substring(0, 500)}`;
+                showDebug(debugText);
+
+                // Coba parse JSON
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                    console.log('📥 Response JSON:', data);
+                } catch (jsonError) {
+                    console.error('❌ Gagal parse JSON:', jsonError);
+                    
+                    // Kalau response diawali <!DOCTYPE, berarti dapet HTML
+                    if (responseText.trim().startsWith('<!DOCTYPE')) {
+                        throw new Error('Server mengembalikan halaman HTML, bukan JSON. Kemungkinan route /v1/create tidak ditemukan.');
+                    } else {
+                        throw new Error(`Server mengembalikan: ${responseText.substring(0, 100)}`);
+                    }
                 }
 
-                // Parse JSON
-                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP Error ${response.status}`);
+                }
 
-                // Cek success flag
                 if (!data.success) {
                     throw new Error(data.error || 'Gagal membuat pesan');
                 }
@@ -124,9 +158,10 @@
                 showResult();
                 form.reset();
                 charCount.textContent = '0';
+                hideDebug();
 
             } catch (error) {
-                console.error('Error detail:', error);
+                console.error('❌ Error detail:', error);
                 showError(error.message);
             } finally {
                 setLoading(false);
@@ -168,7 +203,7 @@
         }
 
         function showError(message) {
-            errorDiv.textContent = message;
+            errorDiv.textContent = '❌ ' + message;
             errorDiv.style.display = 'block';
             
             // Auto hide after 5 seconds
@@ -189,6 +224,26 @@
         function hideResult() {
             resultDiv.style.display = 'none';
         }
+
+        function showDebug(text) {
+            debugDiv.textContent = text;
+            debugDiv.style.display = 'block';
+        }
+
+        function hideDebug() {
+            debugDiv.style.display = 'none';
+        }
+
+        // Test API health on load
+        (async function testHealth() {
+            try {
+                const response = await fetch('/v1/health');
+                const text = await response.text();
+                console.log('🏥 Health check response:', text);
+            } catch (err) {
+                console.error('🏥 Health check failed:', err);
+            }
+        })();
     </script>
 </body>
 </html>
